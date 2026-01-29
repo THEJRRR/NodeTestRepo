@@ -56,6 +56,7 @@ router.get('/', (req, res) => {
     uploadedAt: analysis.uploadedAt,
     fileName: analysis.fileName,
     format: analysis.format,
+    hasDependencyInfo: analysis.hasDependencyInfo || false,
     summary: {
       totalPackages: packages.length,
       packagesWithVulnerabilities: packagesWithVulns.length,

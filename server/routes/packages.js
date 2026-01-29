@@ -78,7 +78,9 @@ router.get('/', (req, res) => {
       vulnerabilityCount: p.vulnerabilities?.length || 0,
       riskScore: p.riskScore,
       maintenanceStatus: p.health?.maintenanceStatus,
-      hasStagnationAlert: p.health?.isStagnant || false
+      hasStagnationAlert: p.health?.isStagnant || false,
+      isDirect: p.isDirect,
+      dependencyType: p.dependencyType
     }))
   });
 });

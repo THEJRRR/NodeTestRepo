@@ -5,6 +5,7 @@ const { parseCycloneDX } = require('../parsers/cyclonedx');
 const { parseSPDX } = require('../parsers/spdx');
 const { detectFormat } = require('../parsers/detector');
 const { analyzePackages } = require('../services/analyzer');
+const { resolveDependencies } = require('../services/dependencyResolver');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -29,15 +30,20 @@ router.post('/', upload.single('sbom'), async (req, res) => {
       return res.status(400).json({ error: 'Unsupported SBOM format. Please upload CycloneDX or SPDX JSON.' });
     }
 
-    let packages;
+    let parseResult;
     if (format === 'cyclonedx') {
-      packages = parseCycloneDX(sbomData);
+      parseResult = parseCycloneDX(sbomData);
     } else if (format === 'spdx') {
-      packages = parseSPDX(sbomData);
+      parseResult = parseSPDX(sbomData);
     }
+
+    const { packages, dependencies } = parseResult;
 
     // Analyze packages for vulnerabilities and health
     const analysis = await analyzePackages(packages);
+    
+    // Resolve direct vs transitive dependencies
+    const dependencyResult = resolveDependencies(analysis.packages, dependencies);
     
     // Store in memory
     req.store.currentAnalysis = {
@@ -45,7 +51,10 @@ router.post('/', upload.single('sbom'), async (req, res) => {
       uploadedAt: new Date().toISOString(),
       fileName: req.file.originalname,
       format,
-      ...analysis
+      packages: dependencyResult.packages,
+      vulnerabilities: analysis.vulnerabilities,
+      dependencyGraph: dependencyResult.dependencyGraph,
+      hasDependencyInfo: dependencyResult.hasDependencyInfo
     };
 
     res.json({
@@ -53,6 +62,7 @@ router.post('/', upload.single('sbom'), async (req, res) => {
       id: req.store.currentAnalysis.id,
       format,
       packageCount: packages.length,
+      hasDependencyInfo: dependencyResult.hasDependencyInfo,
       message: 'SBOM uploaded and analyzed successfully'
     });
   } catch (error) {

@@ -6,6 +6,7 @@ const uploadRoutes = require('./routes/upload');
 const statsRoutes = require('./routes/stats');
 const packagesRoutes = require('./routes/packages');
 const cvesRoutes = require('./routes/cves');
+const dependenciesRoutes = require('./routes/dependencies');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/packages', packagesRoutes);
 app.use('/api/cves', cvesRoutes);
+app.use('/api/dependencies', dependenciesRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

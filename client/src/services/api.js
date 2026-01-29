@@ -64,3 +64,12 @@ export async function getCVEs(params = {}) {
   }
   return response.json();
 }
+
+export async function getDependencies() {
+  const response = await fetch(`${API_BASE}/dependencies`);
+  if (!response.ok) {
+    if (response.status === 404) return { hasDependencyInfo: false, graph: null };
+    throw new Error('Failed to fetch dependencies');
+  }
+  return response.json();
+}

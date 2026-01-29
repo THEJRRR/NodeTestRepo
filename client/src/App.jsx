@@ -4,12 +4,15 @@ import Dashboard from './components/Dashboard'
 import PackageList from './components/PackageList'
 import CVEList from './components/CVEList'
 import PackageDetail from './components/PackageDetail'
-import { getStats, getPackages, getCVEs, getPackageDetails } from './services/api'
+import DependencyGraph from './components/DependencyGraph'
+import { getStats, getPackages, getCVEs, getPackageDetails, getDependencies } from './services/api'
 
 function App() {
   const [stats, setStats] = useState(null)
   const [packages, setPackages] = useState([])
   const [cves, setCves] = useState([])
+  const [dependencyGraph, setDependencyGraph] = useState(null)
+  const [hasDependencyInfo, setHasDependencyInfo] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('packages')
@@ -19,19 +22,23 @@ function App() {
     sortBy: 'risk',
     sortOrder: 'desc',
     severity: '',
-    riskLevel: ''
+    riskLevel: '',
+    dependencyType: ''
   })
 
   const loadData = useCallback(async () => {
     try {
-      const [statsData, packagesData, cvesData] = await Promise.all([
+      const [statsData, packagesData, cvesData, depsData] = await Promise.all([
         getStats(),
         getPackages(filters),
-        getCVEs()
+        getCVEs(),
+        getDependencies()
       ])
       setStats(statsData)
       setPackages(packagesData?.packages || [])
       setCves(cvesData?.vulnerabilities || [])
+      setHasDependencyInfo(statsData?.hasDependencyInfo || false)
+      setDependencyGraph(depsData?.graph || null)
       setError(null)
     } catch (err) {
       console.error('Error loading data:', err)
@@ -90,6 +97,11 @@ function App() {
             <button className={`tab ${activeTab === 'vulnerabilities' ? 'active' : ''}`} onClick={() => setActiveTab('vulnerabilities')}>
               Vulnerabilities ({cves.length})
             </button>
+            {hasDependencyInfo && (
+              <button className={`tab ${activeTab === 'dependencies' ? 'active' : ''}`} onClick={() => setActiveTab('dependencies')}>
+                Dependency Graph
+              </button>
+            )}
           </div>
 
           {activeTab === 'packages' && (
@@ -97,6 +109,10 @@ function App() {
           )}
 
           {activeTab === 'vulnerabilities' && <CVEList cves={cves} />}
+
+          {activeTab === 'dependencies' && hasDependencyInfo && (
+            <DependencyGraph graph={dependencyGraph} onNodeClick={handlePackageClick} />
+          )}
         </>
       )}
 

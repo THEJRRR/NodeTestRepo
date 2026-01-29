@@ -3,20 +3,26 @@ const { v4: uuidv4 } = require('uuid');
 /**
  * Parse SPDX SBOM format and extract packages
  * @param {Object} sbom - SPDX SBOM JSON
- * @returns {Array} - Array of normalized package objects
+ * @returns {Object} - Object with packages array and dependencies info
  */
 function parseSPDX(sbom) {
   const packages = [];
   const spdxPackages = sbom.packages || [];
+  const spdxIdToPackageId = new Map();
 
+  // First pass: create packages and build ID mapping
   for (const spdxPkg of spdxPackages) {
     // Skip the root document package
     if (spdxPkg.SPDXID === 'SPDXRef-DOCUMENT') {
       continue;
     }
 
+    const pkgId = uuidv4();
+    spdxIdToPackageId.set(spdxPkg.SPDXID, pkgId);
+
     const pkg = {
-      id: uuidv4(),
+      id: pkgId,
+      spdxId: spdxPkg.SPDXID,
       name: spdxPkg.name,
       version: spdxPkg.versionInfo || 'unknown',
       ecosystem: detectEcosystem(spdxPkg),
@@ -33,7 +39,53 @@ function parseSPDX(sbom) {
     packages.push(pkg);
   }
 
-  return packages;
+  // Parse relationships if available
+  const dependencies = parseRelationships(sbom.relationships, spdxIdToPackageId);
+
+  return { packages, dependencies };
+}
+
+/**
+ * Parse SPDX relationships array to extract dependency info
+ * @param {Array} relationships - SPDX relationships array
+ * @param {Map} spdxIdToPackageId - Map of SPDX IDs to package IDs
+ * @returns {Object|null} - Dependencies object or null if no relationships
+ */
+function parseRelationships(relationships, spdxIdToPackageId) {
+  if (!relationships || !Array.isArray(relationships) || relationships.length === 0) {
+    return null;
+  }
+
+  const edges = [];
+  let rootId = null;
+
+  for (const rel of relationships) {
+    const { spdxElementId, relatedSpdxElement, relationshipType } = rel;
+
+    // Find the root package (document describes relationship)
+    if (relationshipType === 'DESCRIBES' && spdxElementId === 'SPDXRef-DOCUMENT') {
+      rootId = spdxIdToPackageId.get(relatedSpdxElement) || null;
+      continue;
+    }
+
+    // Only process DEPENDS_ON relationships
+    if (relationshipType !== 'DEPENDS_ON') {
+      continue;
+    }
+
+    const fromId = spdxIdToPackageId.get(spdxElementId);
+    const toId = spdxIdToPackageId.get(relatedSpdxElement);
+
+    if (fromId && toId) {
+      edges.push({ from: fromId, to: toId });
+    }
+  }
+
+  if (edges.length === 0) {
+    return null;
+  }
+
+  return { rootId, edges };
 }
 
 /**
